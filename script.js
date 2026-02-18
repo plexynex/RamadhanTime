@@ -1,5 +1,5 @@
 // Konfigurasi
-const API_BASE = "https://equran.id/api/v2/";
+const API_BASE = "https://equran.id/api/v2";
 const MONTH_YEAR = { year: 2025, month: 3 };
 const savedTheme = localStorage.getItem("theme");
 const savedProvince = localStorage.getItem("provinsi");
@@ -337,5 +337,6 @@ function showError(message) {
 // Inisialisasi
 init();
 setInterval(updateTime, 1000);
+
 
 
