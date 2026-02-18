@@ -140,10 +140,10 @@ async function fetchSchedule() {
 function renderSchedule() {
   tableBody.innerHTML = currentSchedule
     .map(
+          // <td>${getDayName(day.tanggal)}</td>
       (day) => `
         <tr>
           <td>${day.tanggal}</td>
-          <td>${getDayName(day.tanggal)}</td>
           <td>${day.imsak || '-'}</td>
           <td>${day.subuh || '-'}</td>
           <td>${day.dzuhur || '-'}</td>
@@ -387,3 +387,4 @@ init();
 setInterval(updateTime, 1000);
 setInterval(updateDate, 1000);
 updateDate(); // Panggil sekali saat load
+
