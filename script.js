@@ -1,6 +1,9 @@
-// Konfigurasi - UPDATE ke 2026
-const API_BASE = "https://equran.id/api/v2"; // Tetap menggunakan v2
-const MONTH_YEAR = { year: 2026, month: 3 }; // UBAH ke tahun 2026
+// Konfigurasi
+const API_BASE = "https://equran.id/api/v2";
+const CURRENT_YEAR = 2026;
+const savedTheme = localStorage.getItem("theme");
+const savedProvince = localStorage.getItem("provinsi");
+const savedCity = localStorage.getItem("kota");
 
 // Elemen DOM
 const darkModeToggle = document.getElementById("darkModeToggle");
@@ -11,6 +14,7 @@ const tableBody = document.getElementById("tableBody");
 const currentTimeElement = document.getElementById("currentTime");
 const currentDateElement = document.getElementById("currentDate");
 const resetButton = document.getElementById('resetButton');
+const yearDisplay = document.getElementById("yearDisplay");
 
 // State
 let provinces = [];
@@ -19,10 +23,6 @@ let currentSchedule = [];
 let notificationPermission = Notification.permission;
 
 // Inisialisasi Tema
-const savedTheme = localStorage.getItem("theme");
-const savedProvince = localStorage.getItem("provinsi");
-const savedCity = localStorage.getItem("kota");
-
 if (savedTheme === "dark") {
   document.body.classList.add("dark-mode");
   darkModeToggle.innerHTML = '<i class="fas fa-sun"></i>';
@@ -34,6 +34,11 @@ locationButton.addEventListener("click", getLocation);
 provinsiSelect.addEventListener("change", fetchCities);
 kotaSelect.addEventListener("change", fetchSchedule);
 resetButton.addEventListener('click', resetData);
+
+// Tampilkan tahun berjalan
+if (yearDisplay) {
+  yearDisplay.textContent = CURRENT_YEAR;
+}
 
 // Fungsi Utama
 async function init() {
@@ -48,19 +53,22 @@ async function init() {
   hideLoading();
 }
 
-// Fungsi Fetch Data - DIPERBARUI dengan struktur response v2
+// Fungsi Fetch Data
 async function fetchProvinces() {
   try {
-    // API v2 menggunakan wrapper response: { code, message, data }
     const response = await fetch(`${API_BASE}/imsakiyah/provinsi`);
+    if (!response.ok) throw new Error('Network response was not ok');
     const result = await response.json();
     
-    // Mengakses data dari wrapper
-    provinces = result.data || [];
-    populateSelect(provinsiSelect, provinces);
-    provinsiSelect.disabled = false;
+    if (result.code === 200 && result.data) {
+      provinces = result.data;
+      populateSelect(provinsiSelect, provinces);
+      provinsiSelect.disabled = false;
+    } else {
+      throw new Error('Invalid response format');
+    }
   } catch (error) {
-    console.error("Error fetch provinces:", error);
+    console.error('Error fetching provinces:', error);
     showError("Gagal memuat data provinsi");
   }
 }
@@ -71,22 +79,28 @@ async function fetchCities() {
 
   showLoading();
   try {
-    // POST request dengan wrapper response
     const response = await fetch(`${API_BASE}/imsakiyah/kabkota`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ provinsi }),
     });
+    
+    if (!response.ok) throw new Error('Network response was not ok');
     const result = await response.json();
     
-    cities = result.data || [];
-    populateSelect(kotaSelect, cities);
-    kotaSelect.disabled = false;
-    localStorage.setItem("provinsi", provinsi);
+    if (result.code === 200 && result.data) {
+      cities = result.data;
+      populateSelect(kotaSelect, cities);
+      kotaSelect.disabled = false;
+      localStorage.setItem("provinsi", provinsi);
+    } else {
+      throw new Error('Invalid response format');
+    }
     hideLoading();
   } catch (error) {
-    console.error("Error fetch cities:", error);
+    console.error('Error fetching cities:', error);
     showError("Gagal memuat data kota");
+    hideLoading();
   }
 }
 
@@ -97,35 +111,32 @@ async function fetchSchedule() {
 
   showLoading();
   try {
-    // POST request dengan wrapper response
     const response = await fetch(`${API_BASE}/imsakiyah`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ provinsi, kabkota }),
     });
+    
+    if (!response.ok) throw new Error('Network response was not ok');
     const result = await response.json();
     
-    // Asumsi struktur data: result.data[0].imsakiyah
-    // Sesuaikan dengan struktur aktual response API
-    const scheduleData = result.data || [];
-    currentSchedule = scheduleData[0]?.imsakiyah || [];
-    
-    if (currentSchedule.length > 0) {
+    if (result.code === 200 && result.data && result.data.imsakiyah) {
+      currentSchedule = result.data.imsakiyah;
       renderSchedule();
       localStorage.setItem("kota", kabkota);
       setupNotifications();
     } else {
-      showError("Data jadwal tidak ditemukan");
+      throw new Error('Invalid response format');
     }
-    
     hideLoading();
   } catch (error) {
-    console.error("Error fetch schedule:", error);
+    console.error('Error fetching schedule:', error);
     showError("Gagal memuat jadwal");
+    hideLoading();
   }
 }
 
-// Fungsi Render - DIPERBARUI dengan tanggal 2026
+// Fungsi Render
 function renderSchedule() {
   tableBody.innerHTML = currentSchedule
     .map(
@@ -133,12 +144,12 @@ function renderSchedule() {
         <tr>
           <td>${day.tanggal}</td>
           <td>${getDayName(day.tanggal)}</td>
-          <td>${day.imsak}</td>
-          <td>${day.subuh}</td>
-          <td>${day.dzuhur}</td>
-          <td>${day.ashar}</td>
-          <td>${day.maghrib}</td>
-          <td>${day.isya}</td>
+          <td>${day.imsak || '-'}</td>
+          <td>${day.subuh || '-'}</td>
+          <td>${day.dzuhur || '-'}</td>
+          <td>${day.ashar || '-'}</td>
+          <td>${day.maghrib || '-'}</td>
+          <td>${day.isya || '-'}</td>
         </tr>
       `
     )
@@ -152,16 +163,20 @@ function populateSelect(selectElement, data) {
     .join("");
 }
 
-// Fungsi Reset - DIPERTAHANKAN
+// Fungsi Reset
 function resetData() {
+  // Konfirmasi reset
   const isConfirmed = confirm('Apakah Anda yakin ingin mereset semua data dan izin?');
   if (!isConfirmed) {
     return;
   }
   
+  // Menghapus data yang disimpan di localStorage
   localStorage.removeItem('theme');
   localStorage.removeItem('provinsi');
   localStorage.removeItem('kota');
+  
+  // Reset izin notifikasi
   notificationPermission = Notification.permission = 'default';
   alert('Data telah direset dan izin notifikasi telah dihapus.');
   location.reload();
@@ -178,7 +193,6 @@ function toggleDarkMode() {
     : '<i class="fas fa-moon"></i>';
 }
 
-// Fungsi Lokasi - DIPERTAHANKAN
 async function getLocation() {
   if (!navigator.geolocation) {
     showError("Geolocation tidak didukung");
@@ -194,24 +208,27 @@ async function getLocation() {
     const location = await reverseGeocode(latitude, longitude);
     await setLocation(location);
   } catch (error) {
-    handleLocationError(error);
+    handleGeolocationError(error);
   }
   hideLoading();
 }
 
-function handleLocationError(error) {
-  const messages = {
-    [error.PERMISSION_DENIED]: "Izin lokasi ditolak",
-    [error.POSITION_UNAVAILABLE]: "Posisi tidak dapat ditemukan",
-    [error.TIMEOUT]: "Waktu permintaan lokasi habis"
-  };
-  showError(messages[error.code] || "Gagal mendapatkan lokasi");
+function handleGeolocationError(error) {
+  if (error.code === error.PERMISSION_DENIED) {
+    showError("Pengguna menolak untuk memberikan izin lokasi");
+  } else if (error.code === error.POSITION_UNAVAILABLE) {
+    showError("Posisi tidak dapat ditemukan");
+  } else if (error.code === error.TIMEOUT) {
+    showError("Waktu permintaan lokasi habis");
+  } else {
+    showError("Gagal mendapatkan lokasi");
+  }
 }
 
 async function reverseGeocode(lat, lon) {
   try {
     const response = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&accept-language=id`
     );
     const data = await response.json();
     return data.address;
@@ -227,6 +244,7 @@ async function setLocation(location) {
     return;
   }
 
+  // Cari provinsi yang cocok (case insensitive)
   const matchedProvince = provinces.find((p) =>
     p.toLowerCase().includes(province.toLowerCase())
   );
@@ -235,12 +253,13 @@ async function setLocation(location) {
     provinsiSelect.value = matchedProvince;
     await fetchCities();
 
-    const city = location.city || location.town;
+    const city = location.city || location.town || location.county;
     if (!city) {
       showError("Kota tidak ditemukan");
       return;
     }
 
+    // Cari kota yang cocok (case insensitive)
     const matchedCity = cities.find((c) =>
       c.toLowerCase().includes(city.toLowerCase())
     );
@@ -249,67 +268,91 @@ async function setLocation(location) {
       kotaSelect.value = matchedCity;
       await fetchSchedule();
     } else {
-      showError("Kota tidak ditemukan");
+      showError("Kota tidak ditemukan di provinsi yang dipilih");
     }
   } else {
     showError("Provinsi tidak ditemukan");
   }
 }
 
-// Fungsi Notifikasi - DIPERBARUI untuk 2026
 function setupNotifications() {
   if (!("Notification" in window)) return;
   
   if (notificationPermission !== "granted") {
+    alert('Silakan aktifkan notifikasi untuk menerima pengingat waktu sholat.');
     Notification.requestPermission().then((permission) => {
       notificationPermission = permission;
     });
   }
 
+  // Jadwalkan notifikasi untuk setiap hari
   currentSchedule.forEach((day) => {
-    Object.entries(day).forEach(([key, time]) => {
-      if (key === "tanggal") return;
-      
-      // Format tanggal untuk 2026
-      const notificationTime = new Date(
-        `${MONTH_YEAR.year}-${String(MONTH_YEAR.month).padStart(2, '0')}-${String(day.tanggal).padStart(2, '0')}T${time}:00`
-      );
-      
-      scheduleNotification(notificationTime, key);
+    const prayerTimes = {
+      imsak: day.imsak,
+      subuh: day.subuh,
+      dzuhur: day.dzuhur,
+      ashar: day.ashar,
+      maghrib: day.maghrib,
+      isya: day.isya
+    };
+
+    Object.entries(prayerTimes).forEach(([prayer, time]) => {
+      if (time && time !== '-') {
+        scheduleNotification(day.tanggal, time, prayer);
+      }
     });
   });
 }
 
-function scheduleNotification(time, prayerName) {
+function scheduleNotification(day, time, prayerName) {
   const now = new Date();
-  const diff = time - now;
+  
+  // Buat objek Date untuk waktu sholat
+  const prayerDate = new Date(CURRENT_YEAR, 2, day, ...time.split(':'));
+  
+  // Hitung selisih waktu
+  const diff = prayerDate - now;
 
   if (diff > 0) {
     setTimeout(() => {
       if (notificationPermission === "granted") {
-        new Notification(`Waktu ${prayerName} telah tiba`, {
-          body: `Selamat menunaikan ibadah ${prayerName}`,
-          icon: '/icon.png' // Optional: tambahkan icon
+        const prayerNames = {
+          imsak: "Imsak",
+          subuh: "Subuh",
+          dzuhur: "Dzuhur",
+          ashar: "Ashar",
+          maghrib: "Maghrib",
+          isya: "Isya"
+        };
+        
+        new Notification(`Waktu ${prayerNames[prayerName] || prayerName} telah tiba`, {
+          body: `Selamat menunaikan ibadah ${prayerNames[prayerName] || prayerName}`,
+          icon: '/favicon.ico'
         });
       }
     }, diff);
   }
 }
 
-// Fungsi Tanggal dan Waktu - DIPERBAIKI
 function getDayName(day) {
-  // Format: tahun 2026, bulan Maret (2), tanggal
-  const date = new Date(2026, 2, parseInt(day));
-  return date.toLocaleDateString("id-ID", { weekday: "long" });
+  try {
+    const date = new Date(CURRENT_YEAR, 2, day); // Bulan Maret (index 2)
+    return date.toLocaleDateString("id-ID", { weekday: "long" });
+  } catch (error) {
+    console.error('Error getting day name:', error);
+    return '-';
+  }
 }
 
 function updateTime() {
   const now = new Date();
-  currentTimeElement.textContent = now.toLocaleTimeString("id-ID", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
+  if (currentTimeElement) {
+    currentTimeElement.textContent = now.toLocaleTimeString("id-ID", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+  }
 }
 
 function updateDate() {
@@ -320,24 +363,27 @@ function updateDate() {
     month: "long",
     year: "numeric",
   };
-  currentDateElement.textContent = now.toLocaleDateString("id-ID", options);
+  if (currentDateElement) {
+    currentDateElement.textContent = now.toLocaleDateString("id-ID", options);
+  }
 }
 
-// Utility Functions
 function showLoading() {
-  document.querySelector(".loading").style.display = "block";
+  const loadingEl = document.querySelector(".loading");
+  if (loadingEl) loadingEl.style.display = "block";
 }
 
 function hideLoading() {
-  document.querySelector(".loading").style.display = "none";
+  const loadingEl = document.querySelector(".loading");
+  if (loadingEl) loadingEl.style.display = "none";
 }
 
 function showError(message) {
   alert(message);
-  console.error(message);
 }
 
 // Inisialisasi
 init();
 setInterval(updateTime, 1000);
-setInterval(updateDate, 1000); // Update tanggal setiap detik
+setInterval(updateDate, 1000);
+updateDate(); // Panggil sekali saat load
