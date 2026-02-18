@@ -1,6 +1,6 @@
 // Konfigurasi
 const API_BASE = "https://equran.id/api/v2";
-const MONTH_YEAR = { year: 2025, month: 3 };
+const MONTH_YEAR = { year: 2026, month: 3 }; // Diperbarui ke tahun 2026
 const savedTheme = localStorage.getItem("theme");
 const savedProvince = localStorage.getItem("provinsi");
 const savedCity = localStorage.getItem("kota");
@@ -294,7 +294,7 @@ function scheduleNotification(time, prayerName) {
   
 
 function getDayName(day) {
-  const date = new Date(2025, 2, day);
+  const date = new Date(2026, 2, day); // Diperbarui ke tahun 2026
   return date.toLocaleDateString("id-ID", { weekday: "long" });
 }
 
@@ -337,6 +337,3 @@ function showError(message) {
 // Inisialisasi
 init();
 setInterval(updateTime, 1000);
-
-
-
